@@ -48,6 +48,10 @@ def main():
 
 
 def get_logger_and_config(cfg) -> (logging.Logger, dict):
+    '''
+    parsing config from args and put values in cfg,
+    returning logger and updated config
+    '''
     import json
 
     level = 'info'
@@ -97,11 +101,17 @@ def get_logger(filename=None, level='info'):
 
 
 def last_log_from_dir(root_dir: str) -> (datetime, str):
+    '''
+    find last log file in root_dir by datetime in file name
+    '''
     r = re.compile(r"nginx-access.*(\d{8}).*(?:\.gz|\.log)?")
     return last_file_from_dir(root_dir, r, '%Y%m%d')
 
 
 def last_report_from_dir(root_dir: str) -> (datetime, str):
+    '''
+    find last report file in root_dir by datetime in file name
+    '''
     r = re.compile(r"report.*(\d{4}\.\d{2}\.\d{2}).html")
     return last_file_from_dir(root_dir, r, '%Y.%m.%d')
 
@@ -125,17 +135,44 @@ def last_file_from_dir(root_dir: str, name_re: re.Pattern, date_format: str) -> 
 
 
 def process_logfile(logfile: str, logfile_datetime: datetime, to_dir: str):
-    import mimetypes, gzip
+    import mimetypes, gzip, statistics
 
     (_, file_encoding) = mimetypes.guess_type(logfile)
     fd = gzip.open(logfile, 'rt') if file_encoding == 'gzip' else open(logfile, 'r')
 
+    data = {}
+    all_time_sum = 0.0
+    all_counter = 0
 
     for (url, req_time) in log_line_provider(fd):
-        print(url, req_time)
+        req_time = float(req_time)
+        all_time_sum += req_time
+        all_counter += 1
+        if not url in data:
+            data[url] = {
+                'count': 0,
+                'durations': [],
+            }
+        data[url]['count'] += 1
+        data[url]['durations'].append(req_time)
+
+    for _, val in data.items():
+        count = val['count']
+        durations = val['durations']
+        val['count_perc'] = count / all_counter * 100
+        val['time_sum'] = sum(durations)
+        val['time_perc'] = val['time_sum'] / all_time_sum * 100
+        val['time_avg'] = val['time_sum'] / count
+        val['time_max'] = max(durations)
+        val['time_med'] = statistics.median(durations)
+
+    print('done')
 
 
 def log_line_provider(fd):
+    '''
+    generator providing line-by-line from log file
+    '''
     for i in fd:
         arr = clean_str(i).split(' ')
         url = arr[6]
