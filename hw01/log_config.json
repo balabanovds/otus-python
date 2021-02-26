@@ -1,0 +1,7 @@
+{
+    "REPORT_SIZE": 2000,
+    "logger": {
+        "level": "error",
+        "filename": "some.log"
+    }
+}
