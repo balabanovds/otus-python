@@ -7,8 +7,12 @@
 #                     '"$http_user_agent" "$http_x_forwarded_for" "$http_X_REQUEST_ID" "$http_X_RB_USER" '
 #                     '$request_time';
 
-import os, re, sys, logging
+import os
+import re
+import sys
+import logging
 from datetime import datetime
+from typing import Tuple
 from stat_builder import StatBuilder
 
 
@@ -21,35 +25,44 @@ def main():
     }
 
     (logger, config) = get_logger_and_config(config)
-            
 
-    report_dir = os.path.realpath(config["REPORT_DIR"])
     log_dir = os.path.realpath(config["LOG_DIR"])
 
     if not os.path.isdir(log_dir):
         logger.critical("log directory {} does not exist".format(log_dir))
         sys.exit(1)
-    
+
     (log_datetime, log_filename) = last_log_from_dir(log_dir)
 
+    report_dir = os.path.realpath(config["REPORT_DIR"])
     if not os.path.isdir(report_dir):
-        logger.info('first run. creating report directory {}'.format(report_dir))
+        logger.info(
+            'first run. creating report directory {}'.format(report_dir))
         try:
             os.mkdir(report_dir)
         except:
-            logger.exception('failed to create report directory: {}'.format(sys.exc_info()[1]))
+            logger.exception(
+                'failed to create report directory: {}'.format(sys.exc_info()[1]))
             sys.exit(1)
-        process_logfile(log_filename, log_datetime, report_dir)
-        sys.exit(0)
-    
-    (report_datetime, _) = last_report_from_dir(report_dir)
-    if log_datetime > report_datetime:
-        process_logfile(log_filename, log_datetime, report_dir)
     else:
-        logger.info('no newer log file found')
+        (report_datetime, _) = last_report_from_dir(report_dir)
+        if log_datetime <= report_datetime:
+            logger.info('no newer log file found')
+            sys.exit(0)
+
+    sb = StatBuilder(
+        max_records=config["REPORT_SIZE"],
+        err_threshold=config["ERR_THRESHOLD_PERC"],
+        logger=logger)
+
+    sb.process_logfile(log_filename)
+
+    report_file = 'report-{}.html'.format(
+        log_datetime.strftime('%Y.%m.%d'))
+    sb.create_report(os.path.join(report_dir, report_file))
 
 
-def get_logger_and_config(cfg) -> (logging.Logger, dict):
+def get_logger_and_config(cfg) -> Tuple[logging.Logger, dict]:
     '''
     parsing config from args and put values in cfg,
     returning logger and updated config
@@ -77,16 +90,17 @@ def get_logger_and_config(cfg) -> (logging.Logger, dict):
                     if 'filename' in d_logger:
                         filename = d_logger['filename']
             except:
-                logging.exception("failed to parse json config: {}".format(sys.exc_info()[1]))
+                logging.exception(
+                    "failed to parse json config: {}".format(sys.exc_info()[1]))
                 sys.exit(1)
-    
+
     logger = get_logger(level=level, filename=filename)
 
     return (logger, cfg)
 
 
 def parse_args():
-    import  argparse
+    import argparse
 
     parser = argparse.ArgumentParser(description='Counts url stats')
     parser.add_argument('-c', '--config', help='define a json config file')
@@ -102,7 +116,7 @@ def get_logger(filename=None, level='info'):
     return logging.getLogger('log_analyzer')
 
 
-def last_log_from_dir(root_dir: str) -> (datetime, str):
+def last_log_from_dir(root_dir: str) -> Tuple[datetime, str]:
     '''
     find last log file in root_dir by datetime in file name
     '''
@@ -110,7 +124,7 @@ def last_log_from_dir(root_dir: str) -> (datetime, str):
     return last_file_from_dir(root_dir, r, '%Y%m%d')
 
 
-def last_report_from_dir(root_dir: str) -> (datetime, str):
+def last_report_from_dir(root_dir: str) -> Tuple[datetime, str]:
     '''
     find last report file in root_dir by datetime in file name
     '''
@@ -118,13 +132,13 @@ def last_report_from_dir(root_dir: str) -> (datetime, str):
     return last_file_from_dir(root_dir, r, '%Y.%m.%d')
 
 
-def last_file_from_dir(root_dir: str, name_re: re.Pattern, date_format: str) -> (datetime, str):
+def last_file_from_dir(root_dir: str, name_re: re.Pattern, date_format: str) -> Tuple[datetime, str]:
     latest_datetime = datetime.min
     latest_file = ''
-    
+
     for _filename in os.listdir(root_dir):
         _filepath = os.path.join(root_dir, _filename)
-        
+
         if os.path.isfile(_filepath):
             if name_re.fullmatch(_filename):
                 date_str = name_re.findall(_filename)[0]
@@ -134,45 +148,6 @@ def last_file_from_dir(root_dir: str, name_re: re.Pattern, date_format: str) -> 
                     latest_file = _filepath
 
     return (latest_datetime, latest_file)
-
-
-def process_logfile(logfile: str, logfile_datetime: datetime, to_dir: str):
-    import mimetypes, gzip
-
-    (_, file_encoding) = mimetypes.guess_type(logfile)
-    fd = gzip.open(logfile, 'rt') if file_encoding == 'gzip' else open(logfile, 'r')
-
-    stat_builder = StatBuilder() 
-
-    for (url, duration) in log_line_provider(fd):
-        duration = float(duration)
-        stat_builder.add_data(url, duration)
-
-    stat_builder.calculate_stats()
-    
-    filename = 'report-{}.html'.format(logfile_datetime.strftime('%Y.%m.%d'))
-    stat_builder.create_report(os.path.join(to_dir, filename))
-
-
-def log_line_provider(fd):
-    '''
-    generator providing line-by-line from log file
-    '''
-    for i in fd:
-        arr = clean_str(i).split(' ')
-        url = arr[6]
-        req_time = arr[-1]
-        yield (url, req_time)
-
-
-def clean_str(_str: str) -> str:
-    norm_str = re.sub(r'\s{2,}', ' ', _str)
-    return re.sub(r'("|\[|\]|\n)', '', norm_str)
-
-
-def prepare_report(data: dict, logfile_datetime: datetime, to_dir: str):
-    raise NotImplementedError
-
 
 
 if __name__ == "__main__":
