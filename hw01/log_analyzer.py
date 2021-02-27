@@ -9,11 +9,13 @@
 
 import os, re, sys, logging
 from datetime import datetime
+from stat_builder import StatBuilder
 
 
 def main():
     config = {
         "REPORT_SIZE": 1000,
+        "ERR_THRESHOLD_PERC": 10,
         "REPORT_DIR": "./reports",
         "LOG_DIR": "./log"
     }
@@ -135,38 +137,21 @@ def last_file_from_dir(root_dir: str, name_re: re.Pattern, date_format: str) -> 
 
 
 def process_logfile(logfile: str, logfile_datetime: datetime, to_dir: str):
-    import mimetypes, gzip, statistics
+    import mimetypes, gzip
 
     (_, file_encoding) = mimetypes.guess_type(logfile)
     fd = gzip.open(logfile, 'rt') if file_encoding == 'gzip' else open(logfile, 'r')
 
-    data = {}
-    all_time_sum = 0.0
-    all_counter = 0
+    stat_builder = StatBuilder() 
 
-    for (url, req_time) in log_line_provider(fd):
-        req_time = float(req_time)
-        all_time_sum += req_time
-        all_counter += 1
-        if not url in data:
-            data[url] = {
-                'count': 0,
-                'durations': [],
-            }
-        data[url]['count'] += 1
-        data[url]['durations'].append(req_time)
+    for (url, duration) in log_line_provider(fd):
+        duration = float(duration)
+        stat_builder.add_data(url, duration)
 
-    for _, val in data.items():
-        count = val['count']
-        durations = val['durations']
-        val['count_perc'] = count / all_counter * 100
-        val['time_sum'] = sum(durations)
-        val['time_perc'] = val['time_sum'] / all_time_sum * 100
-        val['time_avg'] = val['time_sum'] / count
-        val['time_max'] = max(durations)
-        val['time_med'] = statistics.median(durations)
-
-    print('done')
+    stat_builder.calculate_stats()
+    
+    filename = 'report-{}.html'.format(logfile_datetime.strftime('%Y.%m.%d'))
+    stat_builder.create_report(os.path.join(to_dir, filename))
 
 
 def log_line_provider(fd):
@@ -185,6 +170,8 @@ def clean_str(_str: str) -> str:
     return re.sub(r'("|\[|\]|\n)', '', norm_str)
 
 
+def prepare_report(data: dict, logfile_datetime: datetime, to_dir: str):
+    raise NotImplementedError
 
 
 
