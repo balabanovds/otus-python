@@ -120,7 +120,7 @@ def last_log_from_dir(root_dir: str) -> Tuple[datetime, str]:
     '''
     find last log file in root_dir by datetime in file name
     '''
-    r = re.compile(r"nginx-access.*(\d{8}).*(?:\.gz|\.log)?")
+    r = re.compile(r"nginx-access.*(\d{8})(?:\.gz|\.log)?")
     return last_file_from_dir(root_dir, r, '%Y%m%d')
 
 
