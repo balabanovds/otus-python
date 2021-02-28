@@ -1,4 +1,4 @@
-import datetime
+import sys
 import statistics
 import logging
 from string import Template
@@ -39,6 +39,19 @@ class StatBuilder:
             return
 
         self.__calculate_stats()
+
+    def create_report(self, to_file: str):
+        try:
+            fd = open('report.html', 'r')
+            t = Template(fd.read())
+
+            s = t.safe_substitute(table_json=self.__get_data())
+            fd = open(to_file, 'w')
+            fd.write(s)
+            self.logger.info('created report file: {}'.format(to_file))
+        except:
+            self.logger.exception(
+                'error occured while creating report: {}'.format(sys.exc_info()[1]))
 
     def __log_line_provider(fd):
         '''
@@ -89,13 +102,7 @@ class StatBuilder:
             val['time_med'] = statistics.median(durations)
             val['url'] = key
 
-    def create_report(self, to_file: str):
-        fd = open('report.html', 'r')
-        t = Template(fd.read())
-
-        s = t.safe_substitute(table_json=self.__get_data())
-        fd = open(to_file, 'w')
-        fd.write(s)
-
     def __get_data(self) -> list:
-        return list(self.data.values())
+        sorted_list = sorted(list(self.data.values()),
+                             key=lambda i: i['time_sum'], reverse=True)
+        return sorted_list[:self.max_records]

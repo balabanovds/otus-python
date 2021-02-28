@@ -18,7 +18,7 @@ from stat_builder import StatBuilder
 
 def main():
     config = {
-        "REPORT_SIZE": 1000,
+        "REPORT_SIZE": 10,
         "ERR_THRESHOLD_PERC": 10,
         "REPORT_DIR": "./reports",
         "LOG_DIR": "./log",
