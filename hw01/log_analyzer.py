@@ -21,7 +21,7 @@ def main():
         "REPORT_SIZE": 1000,
         "ERR_THRESHOLD_PERC": 10,
         "REPORT_DIR": "./reports",
-        "LOG_DIR": "./log"
+        "LOG_DIR": "./log",
     }
 
     (logger, config) = get_logger_and_config(config)
@@ -52,7 +52,7 @@ def main():
 
     sb = StatBuilder(
         max_records=config["REPORT_SIZE"],
-        err_threshold=config["ERR_THRESHOLD_PERC"],
+        err_threshold_perc=config["ERR_THRESHOLD_PERC"],
         logger=logger)
 
     sb.process_logfile(log_filename)

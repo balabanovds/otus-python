@@ -7,12 +7,14 @@ import re
 
 class StatBuilder:
     all_counter = 0
+    err_counter = 0
     all_time_sum = 0.0
     data = {}
+    re_url = re.compile(
+        r"^/((?:\w|\d)+[a-zA-Z0-9-._~:?#\[\]@!$&'()*+,;=]*\/*)+(?:\?\S+)*$")
 
-    def __init__(self, max_records: int, err_threshold: int, logger: logging.Logger):
-        self.err_counter = 0
-        self.err_threshold = err_threshold
+    def __init__(self, max_records: int, err_threshold_perc: int, logger: logging.Logger):
+        self.err_threshold_perc = err_threshold_perc
         self.max_records = max_records
         self.logger = logger
 
@@ -20,12 +22,21 @@ class StatBuilder:
         import mimetypes
         import gzip
 
+        self.logger.info('processing file: {}'.format(logfile))
         (_, file_encoding) = mimetypes.guess_type(logfile)
         fd = gzip.open(logfile, 'rt') if file_encoding == 'gzip' else open(
             logfile, 'r')
 
         for (url, duration) in StatBuilder.__log_line_provider(fd):
             self.__add_data(url, duration)
+
+        self.logger.info('in file {} found {} records'.format(
+            logfile, self.all_counter))
+        err_perc = self.err_counter / self.all_counter * 100
+        if err_perc > self.err_threshold_perc:
+            self.logger.error(
+                'error threshold {}%% exceeded - got {}%%. giving up, dude..'.format(self.err_threshold_perc, err_perc))
+            return
 
         self.__calculate_stats()
 
@@ -44,7 +55,11 @@ class StatBuilder:
         return re.sub(r'("|\[|\]|\n)', '', norm_str)
 
     def __add_data(self, url: str, duration: str):
+        self.logger.debug(
+            'processing url \'{}\' with duration {}'.format(url, duration))
         try:
+            if not self.re_url.match(url):
+                raise SyntaxError
             dur = float(duration)
             self.all_time_sum += dur
             if not url in self.data:
@@ -53,9 +68,12 @@ class StatBuilder:
                     'durations': [],
                 }
             self.data[url]['count'] += 1
-            self.data[url]['durations'].append(duration)
-        except:
+            self.data[url]['durations'].append(dur)
+        except ValueError:
             self.logger.warn("duration '{}' is not valid".format(duration))
+            self.err_counter += 1
+        except SyntaxError:
+            self.logger.warn("url '{}' is not valid".format(url))
             self.err_counter += 1
         self.all_counter += 1
 
