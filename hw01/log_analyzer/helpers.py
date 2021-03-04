@@ -30,6 +30,11 @@ def last_log_from_dir(root_dir: str) -> FileInfo:
     return FileInfo(latest_file, latest_datetime)
 
 
+def gen_report_filename(_dir: str, _date: datetime) -> str:
+    datetime_str = datetime.strftime(_date, '%Y.%m.%d')
+    return os.path.join(_dir, f'report-{datetime_str}.html')
+
+
 def log_line_provider(filename: str):
         '''
         generator providing line-by-line from log file

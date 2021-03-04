@@ -11,8 +11,8 @@ import logging, sys, os
 from datetime import datetime
 from logger import init_logger
 from config import get_config
-from helpers import last_log_from_dir
-from stats import parse_log_file, calculate_stats, create_report, StatData
+from helpers import last_log_from_dir, gen_report_filename
+from stats import parse_log_file, calculate_stats, create_report
 
 
 def main():
@@ -51,8 +51,7 @@ def main():
             logger.exception(f'failed to create report directory: {report_dir}')
             sys.exit(1)
 
-    datetime_str = datetime.strftime(log.date, '%Y.%m.%d')
-    report_file = os.path.join(report_dir, f'report-{datetime_str}.html')
+    report_file = gen_report_filename(report_dir, log.date)
     
     if os.path.exists(report_file):
         logger.info(f'report file {report_file} already exists')
