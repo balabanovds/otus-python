@@ -1,4 +1,6 @@
 {
+    "REPORT_DIR": "./testdata/reports",
+    "LOG_DIR": "./testdata/log",
     "logger": {
         "level": "debug"
     }

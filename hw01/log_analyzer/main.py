@@ -7,12 +7,12 @@
 #                     '"$http_user_agent" "$http_x_forwarded_for" "$http_X_REQUEST_ID" "$http_X_RB_USER" '
 #                     '$request_time';
 
+import logging, sys, os
 from datetime import datetime
-import sys, os
-from logger import get_logger
+from logger import init_logger
 from config import get_config
-from helpers import last_log_from_dir, is_report_exists
-from stat_builder import StatBuilder
+from helpers import last_log_from_dir
+from stats import parse_log_file, calculate_stats, create_report, StatData
 
 
 def main():
@@ -31,7 +31,8 @@ def main():
     logger_file = config['logger']['filename'] if 'filename' in config['logger'] else None
     logger_level = config['logger']['level'] if 'level' in config['logger'] else 'info'
      
-    logger = get_logger(filename=logger_file, level=logger_level)
+    init_logger(filename=logger_file, level=logger_level)
+    logger = logging.getLogger()
 
     log_dir = os.path.realpath(config["LOG_DIR"])
 
@@ -39,7 +40,7 @@ def main():
         logger.error(f'log directory {log_dir} does not exist')
         sys.exit(1)
 
-    (log_datetime, log_filename) = last_log_from_dir(log_dir)
+    log = last_log_from_dir(log_dir)
 
     report_dir = os.path.realpath(config["REPORT_DIR"])
     if not os.path.isdir(report_dir):
@@ -50,24 +51,26 @@ def main():
             logger.exception(f'failed to create report directory: {report_dir}')
             sys.exit(1)
 
-    datetime_str = datetime.strftime(log_datetime, '%Y.%m.%d')
+    datetime_str = datetime.strftime(log.date, '%Y.%m.%d')
     report_file = os.path.join(report_dir, f'report-{datetime_str}.html')
     
     if os.path.exists(report_file):
         logger.info(f'report file {report_file} already exists')
         sys.exit(0)
-        
+    
+    sd = parse_log_file(log_file=log.filepath)
 
-    sb = StatBuilder(
-        max_records=config["REPORT_SIZE"],
-        err_threshold_perc=config["ERR_THRESHOLD_PERC"],
-        logger=logger)
+    err_perc: float = sd.counters['err'] / sd.counters['all'] * 100
+    err_threshold_perc = config['ERR_THRESHOLD_PERC']
+    if err_perc > err_threshold_perc:
+        logger.error(
+            f'error threshold {err_threshold_perc}%% exceeded - got {err_perc}%%. giving up, dude..')
+        sys.exit(1)
 
-    sb.process_logfile(log_filename)
+    calculate_stats(sd)
 
-    report_file = 'report-{}.html'.format(
-        log_datetime.strftime('%Y.%m.%d'))
-    sb.create_report(os.path.join(report_dir, report_file))
+
+    create_report(report_file, sd.data, config["REPORT_SIZE"])
 
 
 if __name__ == "__main__":

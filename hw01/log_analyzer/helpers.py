@@ -1,15 +1,15 @@
-import re, os
+import logging, mimetypes, gzip, re, os
 from datetime import datetime
-from typing import Tuple
-from logging import Logger
+from collections import namedtuple
 
 rc_log = re.compile(r"nginx-access.*(\d{8})(?:\.gz|\.log)?")
+FileInfo = namedtuple('FileInfo', ['filepath', 'date'])
 
-def last_log_from_dir(root_dir: str, logger: Logger) -> Tuple[datetime, str]:
+def last_log_from_dir(root_dir: str) -> FileInfo:
     '''
     find last log file in root_dir by datetime in file name
     '''
-
+    logger = logging.getLogger()
     latest_datetime = datetime.min
     latest_file = ''
 
@@ -27,14 +27,26 @@ def last_log_from_dir(root_dir: str, logger: Logger) -> Tuple[datetime, str]:
                 except ValueError:
                     logger.exception(f'failed to parse datetime {date_str}. skipping..')
 
-    return (latest_datetime, latest_file)
-    
+    return FileInfo(latest_file, latest_datetime)
 
-def is_report_exists(report_dir: str, dt: datetime) -> bool:
-    '''
-    check if report file with datetime exists in report_dir
-    '''
 
-    datetime_str = datetime.strftime(dt, '%Y.%m.%d')
-    report_file = os.path.join(report_dir, f'report-{datetime_str}.html')
-    return os.path.exists(report_file)
+def log_line_provider(filename: str):
+        '''
+        generator providing line-by-line from log file
+        '''
+        logger = logging.getLogger()
+        logger.info(f'processing file: {filename}')
+        (_, file_encoding) = mimetypes.guess_type(filename)
+        fd = gzip.open(filename, 'rt') if file_encoding == 'gzip' else open(filename, 'r')
+
+        for line in fd:
+            arr = _clean_str(line).split(' ')
+            url = arr[6]
+            req_time = arr[-1]
+            yield (url, req_time)
+
+        fd.close()
+
+def _clean_str(_str: str) -> str:
+    norm_str = re.sub(r'\s{2,}', ' ', _str)
+    return re.sub(r'("|\[|\]|\n)', '', norm_str)
