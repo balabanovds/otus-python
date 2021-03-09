@@ -1,4 +1,4 @@
-import logging, mimetypes, gzip, re, os
+import logging, gzip, re, os
 from datetime import datetime
 from collections import namedtuple
 
@@ -42,8 +42,7 @@ def log_line_provider(filename: str):
     generator providing line-by-line from log file
     """
     logging.info(f"processing file: {filename}")
-    (_, file_encoding) = mimetypes.guess_type(filename)
-    fd = gzip.open(filename, "rt") if file_encoding == "gzip" else open(filename, "r")
+    fd = gzip.open(filename, "rt") if filename[:-3] == ".gz" else open(filename, "r")
 
     for line in fd:
         norm_str = re.sub(r"\s{2,}", " ", line)
