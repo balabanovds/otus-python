@@ -13,15 +13,18 @@ def get_config(cfg) -> Tuple[dict, None]:
     if not args.config:
         return None
 
-    with open(args.config) as json_file:
-        try:
-            data = json.load(json_file)
-            for field in ["REPORT_SIZE", "REPORT_DIR", "LOG_DIR", "logger"]:
-                if field in data:
-                    cfg[field] = data[field]
-        except JSONDecodeError:
-            logging.exception("failed to parse json config")
-            return None
+    try:
+        with open(args.config) as json_file:
+            try:
+                data = json.load(json_file)
+                for field in ["REPORT_SIZE", "REPORT_DIR", "LOG_DIR", "logger"]:
+                    if field in data:
+                        cfg[field] = data[field]
+            except JSONDecodeError:
+                logging.exception("failed to parse json config")
+                return None
+    except FileNotFoundError:
+        logging.info("no config file found. using hardcoded params")
 
     return cfg
 
