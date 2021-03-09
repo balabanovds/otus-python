@@ -32,29 +32,28 @@ def main():
     logger_level = config['logger']['level'] if 'level' in config['logger'] else 'info'
      
     init_logger(filename=logger_file, level=logger_level)
-    logger = logging.getLogger()
 
     log_dir = os.path.realpath(config["LOG_DIR"])
 
     if not os.path.isdir(log_dir):
-        logger.error(f'log directory {log_dir} does not exist')
+        logging.error(f'log directory {log_dir} does not exist')
         sys.exit(1)
 
     log = last_log_from_dir(log_dir)
 
     report_dir = os.path.realpath(config["REPORT_DIR"])
     if not os.path.isdir(report_dir):
-        logger.info(f'first run. creating report directory {report_dir}')
+        logging.info(f'first run. creating report directory {report_dir}')
         try:
             os.mkdir(report_dir)
         except PermissionError:
-            logger.exception(f'failed to create report directory: {report_dir}')
+            logging.exception(f'failed to create report directory: {report_dir}')
             sys.exit(1)
 
     report_file = gen_report_filename(report_dir, log.date)
     
     if os.path.exists(report_file):
-        logger.info(f'report file {report_file} already exists')
+        logging.info(f'report file {report_file} already exists')
         sys.exit(0)
     
     sd = parse_log_file(log_file=log.filepath)
@@ -62,7 +61,7 @@ def main():
     err_perc: float = sd.counters['err'] / sd.counters['all'] * 100
     err_threshold_perc = config['ERR_THRESHOLD_PERC']
     if err_perc > err_threshold_perc:
-        logger.error(
+        logging.error(
             f'error threshold {err_threshold_perc}%% exceeded - got {err_perc}%%. giving up, dude..')
         sys.exit(1)
 

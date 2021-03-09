@@ -10,7 +10,6 @@ def last_log_from_dir(root_dir: str) -> FileInfo:
     """
     find last log file in root_dir by datetime in file name
     """
-    logger = logging.getLogger()
     latest_datetime = datetime.min
     latest_file = ""
 
@@ -23,7 +22,9 @@ def last_log_from_dir(root_dir: str) -> FileInfo:
                 try:
                     parsed_datetime = datetime.strptime(date_str, "%Y%m%d")
                 except ValueError:
-                    logger.exception(f"failed to parse datetime {date_str}. skipping..")
+                    logging.exception(
+                        f"failed to parse datetime {date_str}. skipping.."
+                    )
                 if parsed_datetime > latest_datetime:
                     latest_datetime = parsed_datetime
                     latest_file = filepath
@@ -40,8 +41,7 @@ def log_line_provider(filename: str):
     """
     generator providing line-by-line from log file
     """
-    logger = logging.getLogger()
-    logger.info(f"processing file: {filename}")
+    logging.info(f"processing file: {filename}")
     (_, file_encoding) = mimetypes.guess_type(filename)
     fd = gzip.open(filename, "rt") if file_encoding == "gzip" else open(filename, "r")
 
